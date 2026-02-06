@@ -4,16 +4,16 @@ from datetime import datetime
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.label import Label
-from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
-from kivy.properties import StringProperty, ListProperty
+from kivy.properties import StringProperty, BooleanProperty
+from kivy.metrics import dp
 from kivy.utils import get_color_from_hex
 
 class TripApp(App):
-    data_riwayat = ListProperty([])
-
     def build(self):
         self.title = "Trip Manager Pro v10"
         self.filename = "data_perjalanan.json"
@@ -26,45 +26,98 @@ class TripApp(App):
         self.selected_index = None
 
         # Main Layout
-        root = BoxLayout(orientation='vertical', spacing=5, padding=10)
+        root = BoxLayout(orientation='vertical', spacing=0)
         
         # Header
-        header = Label(text="TRIP MANAGER", size_hint_y=None, height=50, 
-                       bold=True, color=(1,1,1,1))
+        header = Label(
+            text="TRIP MANAGER", 
+            size_hint_y=None, height=dp(50),
+            bold=True, font_size='18sp',
+            canvas_before=True
+        )
+        with header.canvas.before:
+            from kivy.graphics import Color, Rectangle
+            Color(rgb=get_color_from_hex("#2c3e50"))
+            self.rect = Rectangle(size=header.size, pos=header.pos)
+        header.bind(size=self._update_rect, pos=self._update_rect)
         root.add_widget(header)
 
-        # Form Input
-        form = BoxLayout(orientation='vertical', spacing=5, size_hint_y=None, height=300)
-        self.inputs = {
-            'nama': TextInput(hint_text="Nama Karyawan", multiline=False),
-            'driver': TextInput(hint_text="Driver", multiline=False),
-            'tujuan': TextInput(hint_text="Tujuan", multiline=False),
-            'tgl_p': TextInput(hint_text="Tgl Pergi (Contoh: 06226)", multiline=False),
-            'jam_p': TextInput(hint_text="Jam Pergi (Contoh: 0800)", multiline=False),
-            'tgl_k': TextInput(hint_text="Tgl Kembali (Kosongkan jika jalan)", multiline=False),
-            'jam_k': TextInput(hint_text="Jam Kembali", multiline=False),
-        }
-        
-        for key in self.inputs:
-            form.add_widget(self.inputs[key])
+        # Form Container
+        form = GridLayout(cols=1, spacing=dp(5), padding=dp(10), size_hint_y=None)
+        form.bind(minimum_height=form.setter('height'))
+
+        self.inputs = {}
+        fields = [
+            ("Karyawan", "nama"), ("Driver", "driver"), ("Tujuan", "tujuan"),
+            ("Tgl Pergi (TglBlnThn)", "tgl_p"), ("Jam Pergi (HHMM)", "jam_p"),
+            ("Tgl Kembali", "tgl_k"), ("Jam Kembali", "jam_k")
+        ]
+
+        for label_text, key in fields:
+            form.add_widget(Label(text=label_text, color=(0,0,0,1), size_hint_y=None, height=dp(20), halign='left', text_size=(dp(580), None)))
+            ti = TextInput(multiline=False, size_hint_y=None, height=dp(40), font_size='16sp')
+            # Auto format logic on focus loss
+            if key in ['tgl_p', 'tgl_k']: ti.bind(focus=self.on_tgl_focus)
+            if key in ['jam_p', 'jam_k']: ti.bind(focus=self.on_jam_focus)
+            form.add_widget(ti)
+            self.inputs[key] = ti
+
         root.add_widget(form)
 
-        # Buttons Control
-        btn_box = BoxLayout(size_hint_y=None, height=50, spacing=5)
-        btn_box.add_widget(Button(text="SIMPAN", background_color=get_color_from_hex('#27ae60'), on_press=self.simpan))
-        btn_box.add_widget(Button(text="HAPUS", background_color=get_color_from_hex('#e74c3c'), on_press=self.hapus_terakhir))
-        root.add_widget(btn_box)
+        # Buttons Action
+        btn_layout = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(5), padding=[dp(10), 0])
+        btn_save = Button(text="SIMPAN", background_color=get_color_from_hex("#27ae60"), background_normal='')
+        btn_save.bind(on_release=self.simpan)
+        btn_edit = Button(text="EDIT", background_color=get_color_from_hex("#f39c12"), background_normal='')
+        btn_edit.bind(on_release=self.edit_terpilih)
+        btn_del = Button(text="HAPUS", background_color=get_color_from_hex("#e74c3c"), background_normal='')
+        btn_del.bind(on_release=self.hapus)
+        
+        btn_layout.add_widget(btn_save)
+        btn_layout.add_widget(btn_edit)
+        btn_layout.add_widget(btn_del)
+        root.add_widget(btn_layout)
 
         # History List
-        self.history_layout = BoxLayout(orientation='vertical', size_hint_y=None)
-        self.history_layout.bind(minimum_height=self.history_layout.setter('height'))
+        root.add_widget(Label(text="RIWAYAT TERSEMPAN", color=(0,0,0,1), bold=True, size_hint_y=None, height=dp(30)))
         
-        scroll = ScrollView(size_hint=(1, 1))
-        scroll.add_widget(self.history_layout)
+        self.history_list = GridLayout(cols=1, spacing=dp(2), size_hint_y=None, padding=dp(5))
+        self.history_list.bind(minimum_height=self.history_list.setter('height'))
+        
+        scroll = ScrollView(size_hint=(1, 1), bar_width=dp(10))
+        scroll.add_widget(self.history_list)
         root.add_widget(scroll)
+
+        # Copy Buttons
+        copy_layout = BoxLayout(size_hint_y=None, height=dp(60), spacing=dp(5), padding=dp(10))
+        btn_copy_sel = Button(text="SALIN TERPILIH", background_color=get_color_from_hex("#34495e"), background_normal='')
+        btn_copy_sel.bind(on_release=self.salin_terpilih)
+        btn_copy_all = Button(text="SALIN SEMUA", background_color=get_color_from_hex("#0984e3"), background_normal='')
+        btn_copy_all.bind(on_release=self.salin_semua)
+        
+        copy_layout.add_widget(btn_copy_sel)
+        copy_layout.add_widget(btn_copy_all)
+        root.add_widget(copy_layout)
 
         self.refresh_list()
         return root
+
+    def _update_rect(self, instance, value):
+        self.rect.pos = instance.pos
+        self.rect.size = instance.size
+
+    # --- Logika Data (Sama dengan kode asli) ---
+
+    def muat_data(self):
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r') as f: return json.load(f)
+            except: return []
+        return []
+
+    def simpan_ke_file(self):
+        with open(self.filename, 'w') as f:
+            json.dump(self.data_riwayat, f)
 
     def format_tgl(self, teks):
         if not teks or not teks.isdigit(): return teks
@@ -87,56 +140,109 @@ class TripApp(App):
             elif len(teks) == 4: return f"{teks[:2]}:{teks[2:]}"
         return teks
 
-    def muat_data(self):
-        if os.path.exists(self.filename):
-            try:
-                with open(self.filename, 'r') as f:
-                    return json.load(f)
-            except: return []
-        return []
+    def hitung_durasi(self, tgl_p, jam_p, tgl_k, jam_k):
+        try:
+            if tgl_k == "DALAM PERJALANAN" or tgl_k == "-": return "-"
+            def parse_dt(t_str, j_str):
+                d, m_nama, y = t_str.split()
+                m = next(k for k, v in self.bulan_indo.items() if v == m_nama)
+                j, menit = j_str.split(":")
+                return datetime(int(y), int(m), int(d), int(j), int(menit))
+            start = parse_dt(tgl_p, jam_p)
+            end = parse_dt(tgl_k, jam_k)
+            diff = end - start
+            hari, jam = diff.days, diff.seconds // 3600
+            res = []
+            if hari > 0: res.append(f"{hari} Hari")
+            if jam > 0: res.append(f"{jam} Jam")
+            return " ".join(res) if res else "0 Jam"
+        except: return "-"
 
-    def simpan_ke_file(self):
-        with open(self.filename, 'w') as f:
-            json.dump(self.data_riwayat, f)
+    # --- Event Handlers ---
 
-    def simpan(self, instance):
-        # Ambil data dan format otomatis
-        d = [
-            self.inputs['nama'].text,
-            self.inputs['driver'].text,
-            self.inputs['tujuan'].text,
-            self.format_tgl(self.inputs['tgl_p'].text),
-            self.format_jam(self.inputs['jam_p'].text),
-            self.format_tgl(self.inputs['tgl_k'].text) or "DALAM PERJALANAN",
-            self.format_jam(self.inputs['jam_k'].text) or "-",
-            "-" # Placeholder durasi
-        ]
+    def on_tgl_focus(self, instance, value):
+        if not value: instance.text = self.format_tgl(instance.text)
+
+    def on_jam_focus(self, instance, value):
+        if not value: instance.text = self.format_jam(instance.text)
+
+    def simpan(self, *args):
+        d = [self.inputs[k].text.strip() for k in ["nama", "driver", "tujuan", "tgl_p", "jam_p", "tgl_k", "jam_k"]]
+        if "" in d[:3]: return
         
-        if not d[0] or not d[2]: return
+        if d[5] == "" or d[6] == "":
+            d[5] = "DALAM PERJALANAN"; d[6] = "-"
         
-        self.data_riwayat.append(d)
+        durasi = self.hitung_durasi(d[3], d[4], d[5], d[6])
+        d.append(durasi)
+
+        if self.selected_index is not None:
+            self.data_riwayat[self.selected_index] = d
+            self.selected_index = None
+        else:
+            self.data_riwayat.append(d)
+            
         self.simpan_ke_file()
         self.refresh_list()
-        self.reset_form()
+        for k in self.inputs: self.inputs[k].text = ""
 
     def refresh_list(self):
-        self.history_layout.clear_widgets()
-        for i, r in enumerate(reversed(self.data_riwayat)):
-            txt = f"Karyawan: {r[0]}\nTujuan: {r[2]}\nPergi: {r[3]} {r[4]}\nStatus: {r[5]}"
-            lbl = Label(text=txt, size_hint_y=None, height=120, halign="left", valign="middle",
-                        padding=(10, 10), font_size='12sp')
+        self.history_list.clear_widgets()
+        self.check_boxes = []
+        for i, r in enumerate(self.data_riwayat):
+            row = BoxLayout(size_hint_y=None, height=dp(100), padding=dp(5))
+            cb = CheckBox(size_hint_x=None, width=dp(40), color=(0,0,0,1))
+            cb.group = 'history' # Allow only one selection for edit
+            self.check_boxes.append(cb)
+            
+            txt = (f"Karyawan: {r[0]} | Driver: {r[1]}\nTujuan: {r[2]}\n"
+                   f"Pergi: {r[3]} ({r[4]})\nKembali: {r[5]} ({r[6]})\nDurasi: {r[7]}")
+            
+            lbl = Label(text=txt, color=(0,0,0,1), font_size='12sp', halign='left', valign='middle')
             lbl.bind(size=lbl.setter('text_size'))
-            self.history_layout.add_widget(lbl)
+            
+            row.add_widget(cb)
+            row.add_widget(lbl)
+            self.history_list.add_widget(row)
 
-    def hapus_terakhir(self, instance):
+    def get_selected(self):
+        for i, cb in enumerate(self.check_boxes):
+            if cb.active: return i
+        return None
+
+    def edit_terpilih(self, *args):
+        idx = self.get_selected()
+        if idx is not None:
+            self.selected_index = idx
+            data = self.data_riwayat[idx]
+            keys = ["nama", "driver", "tujuan", "tgl_p", "jam_p", "tgl_k", "jam_k"]
+            for i, k in enumerate(keys):
+                val = data[i]
+                self.inputs[k].text = "" if val in ["DALAM PERJALANAN", "-"] else val
+
+    def hapus(self, *args):
         if self.data_riwayat:
             self.data_riwayat.pop()
             self.simpan_ke_file()
             self.refresh_list()
 
-    def reset_form(self):
-        for key in self.inputs:
-            self.inputs[key].text = ""
+    def salin_terpilih(self, *args):
+        from kivy.core.clipboard import Clipboard
+        idx = self.get_selected()
+        if idx is not None:
+            r = self.data_riwayat[idx]
+            text = f"Karyawan : {r[0]}\nDriver   : {r[1]}\nTujuan   : {r[2]}\nPergi    : {r[3]} ({r[4]})\nKembali  : {r[5]} ({r[6]})\nDurasi   : {r[7]}\n"
+            Clipboard.copy(text)
+
+    def salin_semua(self, *args):
+        from kivy.core.clipboard import Clipboard
+        text = ""
+        for i, r in enumerate(self.data_riwayat):
+            text += f"[{i+1}]\nKaryawan : {r[0]}\nDriver   : {r[1]}\nTujuan   : {r[2]}\nPergi    : {r[3]} ({r[4]})\nKembali  : {r[5]} ({r[6]})\nDurasi   : {r[7]}\n{'-'*20}\n"
+        Clipboard.copy(text)
 
 if __name__ == "__main__":
+    from kivy.core.window import Window
+    Window.clear_color = get_color_from_hex("#f0f2f5")
     TripApp().run()
+    
