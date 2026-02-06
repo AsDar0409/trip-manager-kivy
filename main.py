@@ -84,4 +84,59 @@ class TripApp(App):
     def format_jam(self, teks):
         if teks.isdigit():
             if len(teks) == 3: return f"0{teks[0]}:{teks[1:]}"
-            elif len(teks) == 4: return f
+            elif len(teks) == 4: return f"{teks[:2]}:{teks[2:]}"
+        return teks
+
+    def muat_data(self):
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r') as f:
+                    return json.load(f)
+            except: return []
+        return []
+
+    def simpan_ke_file(self):
+        with open(self.filename, 'w') as f:
+            json.dump(self.data_riwayat, f)
+
+    def simpan(self, instance):
+        # Ambil data dan format otomatis
+        d = [
+            self.inputs['nama'].text,
+            self.inputs['driver'].text,
+            self.inputs['tujuan'].text,
+            self.format_tgl(self.inputs['tgl_p'].text),
+            self.format_jam(self.inputs['jam_p'].text),
+            self.format_tgl(self.inputs['tgl_k'].text) or "DALAM PERJALANAN",
+            self.format_jam(self.inputs['jam_k'].text) or "-",
+            "-" # Placeholder durasi
+        ]
+        
+        if not d[0] or not d[2]: return
+        
+        self.data_riwayat.append(d)
+        self.simpan_ke_file()
+        self.refresh_list()
+        self.reset_form()
+
+    def refresh_list(self):
+        self.history_layout.clear_widgets()
+        for i, r in enumerate(reversed(self.data_riwayat)):
+            txt = f"Karyawan: {r[0]}\nTujuan: {r[2]}\nPergi: {r[3]} {r[4]}\nStatus: {r[5]}"
+            lbl = Label(text=txt, size_hint_y=None, height=120, halign="left", valign="middle",
+                        padding=(10, 10), font_size='12sp')
+            lbl.bind(size=lbl.setter('text_size'))
+            self.history_layout.add_widget(lbl)
+
+    def hapus_terakhir(self, instance):
+        if self.data_riwayat:
+            self.data_riwayat.pop()
+            self.simpan_ke_file()
+            self.refresh_list()
+
+    def reset_form(self):
+        for key in self.inputs:
+            self.inputs[key].text = ""
+
+if __name__ == "__main__":
+    TripApp().run()
