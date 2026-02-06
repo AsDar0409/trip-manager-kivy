@@ -3,27 +3,36 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          sudo apt install -y build-essential git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libsndio-dev
           pip install --upgrade pip
-          pip install buildozer cython==0.29.33 kivy
+          pip install buildozer cython==0.29.33
 
       - name: Build with Buildozer
-        run: yes | buildozer android debug
-        
+        run: |
+          # Menyetujui semua lisensi SDK secara otomatis
+          yes | buildozer android debug
+        continue-on-error: false
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Trip-Manager-App
+          name: TripManager-App
           path: bin/*.apk
