@@ -3,7 +3,8 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # MENGGUNAKAN VERSI 22.04 AGAR LIBTINFO5 TERSEDIA
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -21,18 +22,20 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev libsndio-dev
+          # Di Ubuntu 22.04, libtinfo5 masih tersedia secara resmi
+          sudo apt install -y build-essential git zip unzip openjdk-17-jdk python3-pip \
+            autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake libffi-dev libssl-dev
           pip install --upgrade pip
           pip install buildozer cython==0.29.33
 
       - name: Build with Buildozer
         run: |
-          # Menyetujui semua lisensi SDK secara otomatis
+          # Perintah ini akan otomatis menyetujui lisensi SDK
           yes | buildozer android debug
-        continue-on-error: false
-
+        
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TripManager-App
+          name: TripManager-APK
           path: bin/*.apk
