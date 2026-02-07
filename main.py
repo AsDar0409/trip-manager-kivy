@@ -4,6 +4,7 @@ from datetime import datetime
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
+# 
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
@@ -32,7 +33,7 @@ class ModernInput(TextInput):
 
 class TripAppKivy(App):
     def build(self):
-        self.title = "Modern Trip Manager v11 Blue"
+        self.title = "Modern Trip Manager v11 Blue Search"
         self.filename = "data_perjalanan.json"
         self.bulan_indo = {
             "1": "Januari", "2": "Februari", "3": "Maret", "4": "April",
@@ -40,18 +41,21 @@ class TripAppKivy(App):
             "9": "September", "10": "Oktober", "11": "November", "12": "Desember"
         }
         self.data_riwayat = self.muat_data()
+        self.filtered_data = list(self.data_riwayat)
         self.check_states = []
 
         Window.bind(on_key_down=self.on_global_key_down)
 
-        self.main_layout = BoxLayout(orientation='vertical', padding=[15, 20, 15, 15], spacing=15)
+        self.main_layout = BoxLayout(orientation='vertical', padding=[15, 20, 15, 15], spacing=10)
 
-        header = Label(text="PERJALANAN", size_hint_y=None, height=60,
-                      color=get_color_from_hex("#0277bd"), font_size='26sp', bold=True)
+        # Header
+        header = Label(text="PERJALANAN", size_hint_y=None, height=50,
+                      color=get_color_from_hex("#0277bd"), font_size='24sp', bold=True)
         self.main_layout.add_widget(header)
 
-        input_container = BoxLayout(orientation='vertical', size_hint_y=None, height=350, spacing=10)
-        form = GridLayout(cols=2, spacing=12, size_hint_y=None, height=340)
+        # Input Area
+        input_container = BoxLayout(orientation='vertical', size_hint_y=None, height=340, spacing=8)
+        form = GridLayout(cols=2, spacing=10, size_hint_y=None, height=330)
         
         self.ent_nama = self.add_modern_item(form, "Karyawan")
         self.ent_driver = self.add_modern_item(form, "Driver")
@@ -78,18 +82,30 @@ class TripAppKivy(App):
         for i, widget in enumerate(self.input_list):
             widget.bind(on_text_validate=lambda x, idx=i: self.next_focus(idx))
 
-        btn_box = BoxLayout(size_hint_y=None, height=60, spacing=10)
+        # Buttons Utama
+        btn_box = BoxLayout(size_hint_y=None, height=70, spacing=10)
         self.add_btn(btn_box, "SAVE DATA", "#0288d1", self.simpan)
         self.add_btn(btn_box, "EDIT", "#f57c00", self.edit_terpilih)
         self.add_btn(btn_box, "DELETE", "#d32f2f", self.hapus)
         self.main_layout.add_widget(btn_box)
 
+        # --- SISTEM PENCARIAN (KACA PEMBESAR) ---
+        search_layout = BoxLayout(size_hint_y=None, height=50, spacing=5)
+        search_icon = Label(text="[color=0288d1]©[/color]", markup=True, size_hint_x=None, width=40, font_size='20sp')
+        self.search_input = ModernInput(hint_text="Cari", size_hint_x=1)
+        self.search_input.bind(text=self.filter_data)
+        search_layout.add_widget(search_icon)
+        search_layout.add_widget(self.search_input)
+        self.main_layout.add_widget(search_layout)
+
+        # Scroll Riwayat
         self.scroll = ScrollView()
         self.history_list = BoxLayout(orientation='vertical', size_hint_y=None, spacing=12)
         self.history_list.bind(minimum_height=self.history_list.setter('height'))
         self.scroll.add_widget(self.history_list)
         self.main_layout.add_widget(self.scroll)
 
+        # Footer
         copy_box = BoxLayout(size_hint_y=None, height=70, spacing=10)
         self.add_btn(copy_box, "COPY SELECTED", "#546e7a", self.salin_terpilih)
         self.add_btn(copy_box, "COPY ALL", "#1565c0", self.salin_semua)
@@ -97,6 +113,14 @@ class TripAppKivy(App):
 
         self.refresh()
         return self.main_layout
+
+    def filter_data(self, instance, value):
+        query = value.lower()
+        self.filtered_data = [
+            r for r in self.data_riwayat 
+            if query in r[3].lower() or query in r[5].lower()
+        ]
+        self.refresh(use_filtered=True)
 
     def on_global_key_down(self, window, key, scancode, codepoint, modifier):
         for i, widget in enumerate(self.input_list):
@@ -125,7 +149,7 @@ class TripAppKivy(App):
 
     def add_btn(self, parent, text, color, cmd):
         btn = Button(text=text, background_normal="", background_color=get_color_from_hex(color),
-                     font_size='18sp', bold=True)
+                     font_size='16sp', bold=True)
         btn.bind(on_release=lambda x: cmd())
         parent.add_widget(btn)
 
@@ -137,36 +161,29 @@ class TripAppKivy(App):
         else:
             self.simpan()
 
-    # --- LOGIKA TANGGAL CERDAS (FIX 10, 11, 12) ---
     def format_tgl_modern(self, teks):
         teks = teks.strip()
         if not teks.isdigit(): return teks
-        
-        d, m, y = "", "", ""
-        length = len(teks)
-        
-        if length == 5: # Contoh: 61126
-            d = teks[0].zfill(2)
-            m = teks[1:3] # Coba ambil 2 digit bulan (10, 11, 12)
-            if m not in ["10", "11", "12"]:
-                m = teks[1] # Jika bukan 10-12, ambil 1 digit
-                y = "20" + teks[2:]
-            else:
-                y = "20" + teks[3:]
-        elif length == 4: # Contoh: 6226
-            d, m, y = teks[0].zfill(2), teks[1], "20"+teks[2:]
-        elif length == 6: # Contoh: 061126
-            d, m, y = teks[:2], teks[2:4].lstrip('0'), "20"+teks[4:]
-        elif length == 8: # Contoh: 06112026
-            d, m, y = teks[:2], teks[2:4].lstrip('0'), teks[4:]
-            
-        if m in self.bulan_indo:
-            return f"{d} {self.bulan_indo[m]} {y}"
+        d, m, y, length = "", "", "", len(teks)
+        if length == 5:
+            tgl_awal = int(teks[:2])
+            if 10 <= tgl_awal <= 31: d, m, y = teks[:2], teks[2], "20" + teks[3:]
+            else: d, m, y = teks[0].zfill(2), teks[1:3], "20" + teks[3:]
+        elif length == 4: d, m, y = teks[0].zfill(2), teks[1], "20"+teks[2:]
+        elif length == 6: d, m, y = teks[:2], teks[2:4].lstrip('0'), "20"+teks[4:]
+        elif length == 8: d, m, y = teks[:2], teks[2:4].lstrip('0'), teks[4:]
+        if m in self.bulan_indo: return f"{d} {self.bulan_indo[m]} {y}"
         return teks
 
     def format_jam_modern(self, teks):
         teks = "".join(filter(str.isdigit, teks))
-        if len(teks) == 3: return f"0{teks[0]} : {teks[1:]}"
+        if not teks: return teks
+        if len(teks) == 1: return f"0{teks} : 00"
+        elif len(teks) == 2:
+            val = int(teks)
+            if val < 24: return f"{teks} : 00"
+            else: return f"0{teks[0]} : {teks[1:].zfill(2)}"
+        elif len(teks) == 3: return f"0{teks[0]} : {teks[1:]}"
         elif len(teks) == 4: return f"{teks[:2]} : {teks[2:]}"
         return teks
 
@@ -209,23 +226,29 @@ class TripAppKivy(App):
         durasi = self.hitung_durasi(d[3], d[4], d[5], d[6])
         d.append(durasi)
         idx = self.get_checked_index()
-        if idx is not None: self.data_riwayat[idx] = d
-        else: self.data_riwayat.append(d)
-        self.simpan_ke_file(); self.refresh(); self.reset()
+        if idx is not None:
+            actual_idx = self.data_riwayat.index(self.filtered_data[idx])
+            self.data_riwayat[actual_idx] = d
+        else:
+            self.data_riwayat.append(d)
+        self.simpan_ke_file()
+        self.search_input.text = "" # Reset search after save
+        self.filtered_data = list(self.data_riwayat)
+        self.refresh()
+        self.reset()
 
-    def refresh(self):
+    def refresh(self, use_filtered=False):
         self.history_list.clear_widgets()
-        self.check_states = [False] * len(self.data_riwayat)
-        for i, r in enumerate(self.data_riwayat):
+        display_list = self.filtered_data if use_filtered else self.data_riwayat
+        self.check_states = [False] * len(display_list)
+        for i, r in enumerate(display_list):
             item = BoxLayout(size_hint_y=None, height=190, padding=12)
             with item.canvas.before:
                 Color(rgb=get_color_from_hex("#ffffff"))
                 RoundedRectangle(pos=item.pos, size=item.size, radius=[10])
             item.bind(pos=self._update_rect, size=self._update_rect)
-
             cb = CheckBox(size_hint_x=0.08, color=get_color_from_hex("#0288d1"))
             cb.bind(active=lambda inst, val, idx=i: self.update_cb(idx, val))
-            
             txt_container = GridLayout(cols=2, size_hint_x=0.92, padding=[10, 0])
             def add_data_row(label, value, color="#01579b"):
                 lbl = Label(text=f"[b]{label}[/b]", markup=True, color=get_color_from_hex("#0288d1"),
@@ -234,17 +257,11 @@ class TripAppKivy(App):
                 val = Label(text=f":  {value}", markup=True, color=get_color_from_hex(color),
                             font_size='16sp', size_hint_x=0.7, halign='left', valign='middle')
                 val.bind(size=val.setter('text_size'))
-                txt_container.add_widget(lbl)
-                txt_container.add_widget(val)
-
-            add_data_row("Karyawan", r[0])
-            add_data_row("Driver", r[1])
-            add_data_row("Pergi", f"{r[3]} ({r[4]})")
-            add_data_row("Kembali", f"{r[5]} ({r[6]})")
+                txt_container.add_widget(lbl); txt_container.add_widget(val)
+            add_data_row("Karyawan", r[0]); add_data_row("Driver", r[1])
+            add_data_row("Pergi", f"{r[3]} ({r[4]})"); add_data_row("Kembali", f"{r[5]} ({r[6]})")
             add_data_row("Durasi", r[7], "#2e7d32")
-            
-            item.add_widget(cb)
-            item.add_widget(txt_container)
+            item.add_widget(cb); item.add_widget(txt_container)
             self.history_list.add_widget(item)
 
     def _update_rect(self, instance, value):
@@ -262,7 +279,7 @@ class TripAppKivy(App):
     def edit_terpilih(self):
         idx = self.get_checked_index()
         if idx is not None:
-            data = self.data_riwayat[idx]
+            data = self.filtered_data[idx]
             self.reset()
             for i in range(len(self.input_list)):
                 val = data[i]
@@ -271,26 +288,33 @@ class TripAppKivy(App):
 
     def hapus(self):
         idx = self.get_checked_index()
-        if idx is not None: self.data_riwayat.pop(idx)
-        elif self.data_riwayat: self.data_riwayat.pop()
+        if idx is not None:
+            actual_data = self.filtered_data[idx]
+            self.data_riwayat.remove(actual_data)
+            self.filtered_data.remove(actual_data)
+        elif self.data_riwayat: 
+            self.data_riwayat.pop()
         self.simpan_ke_file(); self.refresh()
 
     def reset(self):
         for e in self.input_list: e.text = ""
         self.ent_nama.focus = True
 
+    def get_formatted_text(self, r, i):
+        return (f"[{i+1}]\nKaryawan : {r[0]}\nDriver   : {r[1]}\nTujuan   : {r[2]}\n"
+                f"Pergi    : {r[3]} ({r[4]})\nKembali  : {r[5]} ({r[6]})\n"
+                f"Durasi   : {r[7]}\n" + "-"*20 + "\n")
+
     def salin_terpilih(self):
         text = ""
         for i, s in enumerate(self.check_states):
-            if s:
-                r = self.data_riwayat[i]
-                text += f"Karyawan: {r[0]} | Driver: {r[1]} | Durasi: {r[7]}\n"
+            if s: text += self.get_formatted_text(self.filtered_data[i], i)
         if text: Clipboard.copy(text)
 
     def salin_semua(self):
         text = ""
-        for r in self.data_riwayat:
-            text += f"Karyawan: {r[0]} | Driver: {r[1]} | Durasi: {r[7]}\n"
+        for i, r in enumerate(self.data_riwayat):
+            text += self.get_formatted_text(r, i)
         if text: Clipboard.copy(text)
 
 if __name__ == "__main__":
