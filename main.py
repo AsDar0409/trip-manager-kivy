@@ -91,7 +91,7 @@ class TripAppKivy(App):
         self.add_btn(btn_box, "DEL", "#d32f2f", self.hapus)
         self.main_layout.add_widget(btn_box)
 
-        self.search_input = ModernInput(hint_text="🔍 Cari Riwayat...", size_hint_y=None, height=55)
+        self.search_input = ModernInput(hint_text="©", size_hint_y=None, height=55)
         self.search_input.bind(text=self.filter_data); self.main_layout.add_widget(self.search_input)
 
         self.scroll = ScrollView()
