@@ -39,7 +39,7 @@ class TripAppKivy(App):
         
         # --- DATA MASTER ---
         self.list_karyawan = sorted(["Asep", "Muklis", "Rehan", "Fachrul", "Alfin", "Luthfi", "Yohanes"])
-        self.list_driver = sorted(["Andik", "Rosi", "Adi", "Agus", "Indrayana", "Arif", "Yusuf", "Huda", "Yayah"])
+        self.list_driver = sorted(["Bp. Andik", "Bp. Rosi", "Bp. Adi", "Bp. Agus", "Bp. Indrayana", "Bp. Arif", "Bp. Yusuf", "Bp. Huda", "Bp. Yayah", "Bp.Tri K", "Bp. Sigit"])
         self.list_tgl = [str(i).zfill(2) for i in range(1, 32)]
         self.list_bln = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
         self.list_thn = ["2025", "2026", "2027", "2028", "2029", "2030"]
